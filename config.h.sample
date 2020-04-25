@@ -3,10 +3,13 @@
 #define MQTT_USERNAME    _MQTT_server_username_
 #define MQTT_KEY         _MQTT_server_password_
 #define MQTT_CHANNEL     _MQTT_server_channel_to_publish_under_
-#define INPUT_PIN		 _pin_connected_to_sensor_data_
 
 #define WIFI_SSID        _your_wifi_ssid_
 #define WIFI_PASSWD      _your_wifi_password_
+
+#define INPUT_PIN		 _pin_connected_to_sensor_data_
+
+#define SLEEP_TIME        10
 
 //OTA not implemented
 //#define OTA_PORT          _default_8266
