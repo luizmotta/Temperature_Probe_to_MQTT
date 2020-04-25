@@ -12,7 +12,7 @@
 #include "config.h"
 
 int ledPin = LED_BUILTIN;       // choose the pin for the LED
-int inputPin = D2;              // choose the input pin (for temperature probe)
+int inputPin = INPUT_PIN;       // choose the input pin (for temperature probe)
 int val = 0;                    // variable for reading the pin status
 
 // Create an ESP8266 WiFiClient class to connect to the MQTT server.
