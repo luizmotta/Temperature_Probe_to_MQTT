@@ -12,8 +12,14 @@
 #include "config.h"
 
 int ledPin = LED_BUILTIN;       // choose the pin for the LED
-int inputPin = INPUT_PIN;       // choose the input pin (for temperature probe)
 int val = 0;                    // variable for reading the pin status
+
+#ifdef DATA_INPUT_PIN
+  int inputPin = DATA_INPUT_PIN;  // choose the input pin (for temperature probe)
+#endif
+#ifdef VOLTAGE_INPUT_PIN
+  int voltagePin = VOLTAGE_INPUT_PIN;  // choose the input pin (for battery voltage)
+#endif
 
 // Create an ESP8266 WiFiClient class to connect to the MQTT server.
 WiFiClient client;
@@ -21,16 +27,21 @@ WiFiClient client;
 // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
 Adafruit_MQTT_Client mqtt(&client, MQTT_SERVER, MQTT_SERVERPORT, MQTT_USERNAME, MQTT_KEY);
 
-// Setup a feed called 'mqtt_client' for publishing.
-Adafruit_MQTT_Publish mqtt_client = Adafruit_MQTT_Publish(&mqtt, MQTT_CHANNEL);
+// Setup MQTT feeds for publishing.
+#ifdef VOLTAGE_INPUT_PIN
+  Adafruit_MQTT_Publish mqtt_client_voltage = Adafruit_MQTT_Publish(&mqtt, MQTT_CHANNEL_VOLTAGE);
+#endif
 
+#ifdef DATA_INPUT_PIN
+  Adafruit_MQTT_Publish mqtt_client_data = Adafruit_MQTT_Publish(&mqtt, MQTT_CHANNEL_DATA);
 // Setup a oneWire instance to communicate with any OneWire devices  
-// (not just Maxim/Dallas temperature ICs) 
-OneWire oneWire(inputPin); 
-/********************************************************************/
-// Pass our oneWire reference to Dallas Temperature. 
-DallasTemperature sensors(&oneWire);
-/********************************************************************/ 
+  // (not just Maxim/Dallas temperature ICs) 
+  OneWire oneWire(inputPin); 
+  /********************************************************************/
+  // Pass our oneWire reference to Dallas Temperature. 
+  DallasTemperature sensors(&oneWire);
+  /********************************************************************/ 
+#endif
 
 // Function to connect and reconnect as necessary to the MQTT server.
 // Should be called in the loop function and it will take care if connecting.
@@ -104,7 +115,13 @@ void setupOTA() {
 
 void setup() {
   pinMode(ledPin, OUTPUT);      // declare LED as output
-  pinMode(inputPin, INPUT);     // declare sensor as input
+
+  #ifdef DATA_INPUT_PIN
+    pinMode(inputPin, INPUT);     // declare sensor as input
+  #endif
+  #ifdef VOLTAGE_INPUT_PIN
+    pinMode(voltagePin, INPUT);   // declare battery voltage as input
+  #endif
 
   Serial.begin(115200);
   Serial.println("Booting");
@@ -122,17 +139,31 @@ void setup() {
 
   MQTT_connect();
 
-  sensors.begin(); 
-  sensors.requestTemperatures(); // Send the command to get temperature readings
-  float tempC = sensors.getTempCByIndex(0);
-  Serial.print("Temperature read: ");
-  Serial.println(tempC);
+  #ifdef VOLTAGE_INPUT_PIN
+    //Read battery voltage
+    float voltage = (analogRead(A0) * 5.5) / 1024.0;
+    Serial.print("Voltage read: ");
+    Serial.println(voltage);
+    if (! mqtt_client_voltage.publish(voltage)) {
+      Serial.println(F("Failed publishing MQTT message"));
+    } else {
+      Serial.println(F("Success publishing MQTT message!"));
+    }
+  #endif
 
-  if (! mqtt_client.publish(tempC)) {
-    Serial.println(F("Failed publishing MQTT message"));
-  } else {
-    Serial.println(F("Success publishing MQTT message!"));
-  }
+  #ifdef DATA_INPUT_PIN
+    sensors.begin(); 
+    sensors.requestTemperatures(); // Send the command to get temperature readings
+    float tempC = sensors.getTempCByIndex(0);
+    Serial.print("Temperature read: ");
+    Serial.println(tempC);
+  
+    if (! mqtt_client_data.publish(tempC)) {
+      Serial.println(F("Failed publishing MQTT message"));
+    } else {
+      Serial.println(F("Success publishing MQTT message!"));
+    }
+  #endif
 
 /*
   setupOTA();

@@ -7,7 +7,8 @@
 #define WIFI_SSID        _your_wifi_ssid_
 #define WIFI_PASSWD      _your_wifi_password_
 
-#define INPUT_PIN		 _pin_connected_to_sensor_data_
+#define DATA_INPUT_PIN	  _pin_connected_to_sensor_data_
+#define VOLTAGE_INPUT_PIN _pin_connected_to_battery_voltage_analog_
 
 #define SLEEP_TIME        10
 
