@@ -141,16 +141,16 @@ void setup() {
 
   #ifdef VOLTAGE_INPUT_PIN
     //Read battery voltage
-    float voltage = (analogRead(A0) * 5.5) / 1024.0;
+    float voltage = ( analogRead(VOLTAGE_INPUT_PIN) * (VOLTAGE_SLOPE) + (VOLTAGE_INTERCEPT) );
     Serial.print("Voltage read: ");
     Serial.println(voltage);
-    if (! mqtt_client_voltage.publish(voltage)) {
+    if (!mqtt_client_voltage.publish(voltage)) {
       Serial.println(F("Failed publishing MQTT message"));
     } else {
       Serial.println(F("Success publishing MQTT message!"));
     }
   #endif
-
+  delay(500);
   #ifdef DATA_INPUT_PIN
     sensors.begin(); 
     sensors.requestTemperatures(); // Send the command to get temperature readings
@@ -158,7 +158,7 @@ void setup() {
     Serial.print("Temperature read: ");
     Serial.println(tempC);
   
-    if (! mqtt_client_data.publish(tempC)) {
+    if (!mqtt_client_data.publish(tempC)) {
       Serial.println(F("Failed publishing MQTT message"));
     } else {
       Serial.println(F("Success publishing MQTT message!"));
@@ -176,8 +176,10 @@ void setup() {
   }
 */
   Serial.println(F("Going to sleep"));
+
   delay(1000);
   ESP.deepSleep(SLEEP_TIME * 60 * 10e5);//10e5 = 1 second
+
   //ESP.deepSleep(60 * 10e5);//10e5 = 1 second
   //delay(SLEEP_TIME * 10E3);
   //ESP.restart();
