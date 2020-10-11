@@ -21,6 +21,8 @@ int val = 0;                    // variable for reading the pin status
   int voltagePin = VOLTAGE_INPUT_PIN;  // choose the input pin (for battery voltage)
 #endif
 
+unsigned long lastSent; // last MQTT message published
+
 // Create an ESP8266 WiFiClient class to connect to the MQTT server.
 WiFiClient client;
 
@@ -57,21 +59,25 @@ void MQTT_connect() {
 
   uint8_t retries = 3;
   while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
+       Serial.println("MQTT connection failed:");
        Serial.println(mqtt.connectErrorString(ret));
        Serial.println("Retrying MQTT connection in 5 seconds...");
        mqtt.disconnect();
        delay(5000);  // wait 5 seconds
        retries--;
        if (retries == 0) {
-         // basically die and wait for WDT to reset me
-         Serial.println("Couldn't connect, resetting.");
-         ESP.restart();
+         Serial.println("Couldn't connect to MQTT. Rebooting...");
+         if( SLEEP_DONT_LOOP ) {
+           ESP.deepSleep(15 * 10e5);//10e5 = 1 second
+         } else {
+           ESP.restart();
+         }
        }
   }
   Serial.println("MQTT Connected!");
 }
 
-/*
+#ifdef OTA_PORT
 void setupOTA() {
   ArduinoOTA.setHostname(OTA_HOSTNAME);
   ArduinoOTA.setPort(OTA_PORT);
@@ -111,7 +117,7 @@ void setupOTA() {
   });
   ArduinoOTA.begin();
 }
-*/
+#endif
 
 void setup() {
   pinMode(ledPin, OUTPUT);      // declare LED as output
@@ -128,15 +134,32 @@ void setup() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWD);
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    Serial.println("Connection Failed! Rebooting...");
-    delay(5000);
-    ESP.restart();
+    Serial.println("Wifi connection failed! Rebooting...");
+    if( SLEEP_DONT_LOOP ) {
+      ESP.deepSleep(15 * 10e5);//10e5 = 1 second
+    } else {
+      ESP.restart();
+    }
   }
 
   Serial.println("Ready");
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
+  #ifdef OTA_PORT
+    setupOTA();
+  #endif
+
+  if( SLEEP_DONT_LOOP ) {
+    loop();
+    Serial.println(F("Going to sleep..."));
+    ESP.deepSleep(SLEEP_TIME * 60 * 10e5);//10e5 = 1 second
+    delay(1000);
+  }
+}
+
+void loop() {
+  unsigned long lastRun; // variable to store last run
   MQTT_connect();
 
   #ifdef VOLTAGE_INPUT_PIN
@@ -150,7 +173,9 @@ void setup() {
       Serial.println(F("Success publishing MQTT message!"));
     }
   #endif
+  
   delay(500);
+  
   #ifdef DATA_INPUT_PIN
     sensors.begin(); 
     sensors.requestTemperatures(); // Send the command to get temperature readings
@@ -165,26 +190,13 @@ void setup() {
     }
   #endif
 
-/*
-  setupOTA();
-  uint8_t timeout_OTA = 600;
-  while (timeout_OTA > 0) {
-     //Serial.println(F("Checking for OTA..."));
-     ArduinoOTA.handle();
-     delay(100);
-     timeout_OTA--;
-  }
-*/
-  Serial.println(F("Going to sleep"));
+  lastRun = millis();
+  
+  #ifdef OTA_PORT
+    while( millis() < ( lastRun + SLEEP_TIME * 1000 * 60 ) ) {
+        ArduinoOTA.handle();
+      delay(100);
+    }
+  #endif
 
-  delay(1000);
-  ESP.deepSleep(SLEEP_TIME * 60 * 10e5);//10e5 = 1 second
-
-  //ESP.deepSleep(60 * 10e5);//10e5 = 1 second
-  //delay(SLEEP_TIME * 10E3);
-  //ESP.restart();
-}
-
-void loop() {
-   //UNUSED
 }
