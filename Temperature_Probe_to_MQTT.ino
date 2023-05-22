@@ -57,24 +57,37 @@ void MQTT_connect() {
 
   Serial.print("Connecting to MQTT... ");
 
-  uint8_t retries = 3;
-  while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
-       Serial.println("MQTT connection failed:");
-       Serial.println(mqtt.connectErrorString(ret));
-       Serial.println("Retrying MQTT connection in 5 seconds...");
-       mqtt.disconnect();
-       delay(5000);  // wait 5 seconds
-       retries--;
-       if (retries == 0) {
-         Serial.println("Couldn't connect to MQTT. Rebooting...");
-         if( SLEEP_DONT_LOOP ) {
-           ESP.deepSleep(15 * 10e5);//10e5 = 1 second
-         } else {
-           ESP.restart();
-         }
-       }
+  if (mqtt.connect()) { // connect will return 0 for connected
+    Serial.print("MQTT connection failed:");
+    Serial.println(mqtt.connectErrorString(ret));
+    mqtt.disconnect();
+    Serial.println("Aborting...");
+    if( SLEEP_DONT_LOOP ) {
+      ESP.deepSleep(SLEEP_TIME * 10e5);//10e5 = 1 second
+      delay(1000);
+    } else {
+      ESP.restart();
+    }
   }
   Serial.println("MQTT Connected!");
+}
+
+void WiFi_connect() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWD);
+  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+    Serial.println("Wifi connection failed! Aborting...");
+    if (SLEEP_DONT_LOOP) {
+      ESP.deepSleep(SLEEP_TIME * 10e5);//10e5 = 1 second
+      delay(1000);
+    } else {
+      ESP.restart();
+    }
+  }
+
+  Serial.println("Ready");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
 }
 
 #ifdef OTA_PORT
@@ -131,36 +144,28 @@ void setup() {
 
   Serial.begin(115200);
   Serial.println("Booting");
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWD);
-  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    Serial.println("Wifi connection failed! Rebooting...");
-    if( SLEEP_DONT_LOOP ) {
-      ESP.deepSleep(15 * 10e5);//10e5 = 1 second
-    } else {
-      ESP.restart();
-    }
-  }
 
-  Serial.println("Ready");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
+  WiFi_connect();
 
   #ifdef OTA_PORT
     setupOTA();
   #endif
 
   if( SLEEP_DONT_LOOP ) {
-    loop();
-    Serial.println(F("Going to sleep..."));
-    ESP.deepSleep(SLEEP_TIME * 60 * 10e5);//10e5 = 1 second
+    collectAndPublish();
+    delay(2000);
+    mqtt.disconnect();
+    delay(1000);
+    Serial.println(F("Going to sleep..."));h
+    ESP.deepSleep(SLEEP_TIME * 10e5);//10e5 = 1 second
     delay(1000);
   }
 }
 
-void loop() {
-  unsigned long lastRun; // variable to store last run
-  MQTT_connect();
+void collectAndPublish() {
+  MQTT_connect(); // just in case it disconnected
+
+  delay(500);
 
   #ifdef VOLTAGE_INPUT_PIN
     //Read battery voltage
@@ -189,14 +194,21 @@ void loop() {
       Serial.println(F("Success publishing MQTT message!"));
     }
   #endif
+}
 
-  lastRun = millis();
+void loop() {
+  unsigned long lastRun; // variable to store last run
+
+  collectAndPublish();
   
+  lastRun = millis();
   #ifdef OTA_PORT
-    while( millis() < ( lastRun + SLEEP_TIME * 1000 * 60 ) ) {
-        ArduinoOTA.handle();
+    while( millis() < ( lastRun + SLEEP_TIME * 1000 ) ) {
+      ArduinoOTA.handle();
       delay(100);
     }
+  #else
+    delay(SLEEP_TIME * 1000);
   #endif
 
 }
